@@ -1,12 +1,11 @@
 import os
 from selenium import webdriver
-from selenium.webdriver.chrome.service import Service
 from selenium.webdriver.chrome.options import Options
 from selenium.webdriver.common.by import By
 from twilio.rest import Client
 import time
 
-# Twilio credentials
+# Load credentials from environment variables
 TWILIO_SID = os.getenv("TWILIO_SID")
 TWILIO_AUTH = os.getenv("TWILIO_AUTH")
 TWILIO_PHONE = os.getenv("TWILIO_PHONE")
@@ -20,16 +19,12 @@ def send_alert(message):
     client.messages.create(from_="whatsapp:" + TWILIO_PHONE, to=YOUR_PHONE, body=message)
     client.messages.create(from_=TWILIO_PHONE, to=SMS_PHONE, body=message)
 
-def get_driver():
-    chrome_options = Options()
-    chrome_options.add_argument("--headless")
-    chrome_options.add_argument("--no-sandbox")
-    chrome_options.add_argument("--disable-dev-shm-usage")
-    chrome_options.binary_location = "/usr/bin/chromium"
-    return webdriver.Chrome(service=Service("/usr/bin/chromedriver"), options=chrome_options)
-
 def check_assignments():
-    driver = get_driver()
+    options = Options()
+    options.add_argument("--headless")
+    options.add_argument("--no-sandbox")
+    options.add_argument("--disable-dev-shm-usage")
+    driver = webdriver.Chrome(options=options)
 
     try:
         driver.get("https://erp.aurora.ac.in/auth/login")
@@ -40,6 +35,7 @@ def check_assignments():
         driver.find_element(By.TAG_NAME, "form").submit()
         time.sleep(10)
 
+        # Stay on dashboard and search for assignment rows
         buttons = driver.find_elements(By.XPATH, "//button[contains(text(),'Not Submitted')]")
         alerts = []
         for button in buttons:
@@ -54,7 +50,7 @@ def check_assignments():
             print("✅ No pending assignments found.")
 
     except Exception as e:
-        send_alert("⚠️ Submission Bot Error: " + str(e))
+        send_alert("⚠️ Bot Error: " + str(e))
 
     finally:
         driver.quit()
