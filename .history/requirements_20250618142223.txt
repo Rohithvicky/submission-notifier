@@ -1,0 +1,2 @@
+selenium==4.21.0
+twilio==9.0.0
