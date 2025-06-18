@@ -1,5 +1,6 @@
 FROM python:3.10-slim
 
+# Install Chromium and chromedriver
 RUN apt-get update && apt-get install -y \
     chromium-driver \
     chromium \
@@ -23,12 +24,15 @@ RUN apt-get update && apt-get install -y \
     curl \
     && apt-get clean
 
+# Set environment variable for Chrome
 ENV CHROME_BIN=/usr/bin/chromium
 ENV PATH="$PATH:/usr/lib/chromium/"
 
+# Install Python dependencies
 COPY requirements.txt .
 RUN pip install --no-cache-dir -r requirements.txt
 
+# Copy your bot code
 COPY submission_notifier.py .
 
 CMD ["python", "submission_notifier.py"]
