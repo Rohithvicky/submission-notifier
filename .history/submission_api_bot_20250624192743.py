@@ -1,12 +1,9 @@
 import os
-import time
-from selenium import webdriver
-from selenium.webdriver.common.by import By
 import requests
 from twilio.rest import Client
 
-# Load from Railway environment
-TOKEN = os.getenv("TOKEN")
+# Load environment variables from Railway
+token = os.getenv("token")
 SEMESTER = os.getenv("SEMESTER")
 INSTITUTION = os.getenv("INSTITUTION")
 USER_ID = os.getenv("USER_ID")
@@ -30,19 +27,21 @@ def send_alert(message):
         print("❌ Failed to send WhatsApp alert:", str(e))
 
 def check_submissions():
-    # ✅ Use the working API endpoint
     url = f"https://aurorabackend.creatrixcampus.com/api/v1/examallocation/getstudentallocation/reqFor/ongoing/userid/{USER_ID}"
 
     headers = {
-        "token": TOKEN,
+        "token": token,
         "semester": SEMESTER,
         "institution": INSTITUTION,
         "origin": "https://erp.aurora.ac.in",
         "referer": "https://erp.aurora.ac.in",
         "accept": "application/json, text/plain, */*",
+        "user-agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/137.0.0.0 Safari/537.36"
     }
 
+    print("🚀 Sending headers:", headers)
     response = requests.get(url, headers=headers)
+    print("📥 API Response:", response.status_code, response.text)
 
     if response.status_code == 401:
         send_alert("🔐 Token expired! Please update the TOKEN in Railway.")
@@ -54,16 +53,23 @@ def check_submissions():
 
     data = response.json()
     assignments = data.get("examallocation", [])
-    alerts = []
 
+    print("📦 Assignments data:", assignments)
+
+    alerts = []
     for a in assignments:
         if a.get("assignment_status") == "Not Submitted":
-            alerts.append(f"📚 {a['name']}\n📘 {a['coursename']}\n🕒 Due: {a['end_date']}")
+            alerts.append(
+                f"📚 {a['name']}\n📘 {a['coursename']}\n🕒 Due: {a['end_date']}"
+            )
+
+    print("🔔 Alerts to send:", alerts)
 
     if alerts:
-        full_message = "📝 Pending Assignments:\n\n" + "\n\n".join(alerts)
-        send_alert(full_message)
+        for msg in alerts:
+            send_alert(msg)
     else:
         send_alert("✅ Bot ran — no pending submissions found.")
 
+# Run the bot
 check_submissions()
