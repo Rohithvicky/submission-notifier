@@ -1,13 +1,13 @@
 import os
+import time
+from selenium import webdriver
+from selenium.webdriver.common.by import By
 import requests
 from twilio.rest import Client
 
-# Load from Railway environment
-TOKEN = os.getenv("TOKEN")
-SEMESTER = os.getenv("SEMESTER")
-INSTITUTION = os.getenv("INSTITUTION")
-USER_ID = os.getenv("USER_ID")
-
+# Load from environment variables
+USERNAME = os.getenv("ERP_USERNAME")
+PASSWORD = os.getenv("ERP_PASSWORD")
 TWILIO_SID = os.getenv("TWILIO_SID")
 TWILIO_AUTH = os.getenv("TWILIO_AUTH")
 TWILIO_PHONE = "whatsapp:+14155238886"  # Twilio Sandbox Number
@@ -17,23 +17,33 @@ def send_alert(message):
     client = Client(TWILIO_SID, TWILIO_AUTH)
     client.messages.create(from_=TWILIO_PHONE, to=YOUR_PHONE, body=message)
 
-def check_submissions():
-    # ✅ Use the working API endpoint
-    url = f"https://aurorabackend.creatrixcampus.com/api/v1/examallocation/getstudentallocation/reqFor/ongoing/userid/{USER_ID}"
+def refresh_token():
+    # Set up the Selenium WebDriver
+    driver = webdriver.Chrome()  # Ensure you have the ChromeDriver installed
+    driver.get("https://erp.aurora.ac.in/login")
+
+    # Log in to the ERP
+    driver.find_element(By.NAME, "username").send_keys(USERNAME)
+    driver.find_element(By.NAME, "password").send_keys(PASSWORD)
+    driver.find_element(By.NAME, "submit").click()
+
+    time.sleep(5)  # Wait for the page to load
+
+    # Retrieve the token from the page (adjust the selector as needed)
+    token = driver.execute_script("return localStorage.getItem('token');")
+
+    driver.quit()
+    return token
+
+def check_submissions(token):
+    url = f"https://aurorabackend.creatrixcampus.com/api/v1/examallocation/getstudentallocation/reqFor/ongoing/userid/{os.getenv('USER_ID')}"
 
     headers = {
-        "token": TOKEN,
-        "semester": SEMESTER,
-        "institution": INSTITUTION,
-        "origin": "https://erp.aurora.ac.in",
-        "referer": "https://erp.aurora.ac.in",
+        "token": token,
         "accept": "application/json, text/plain, */*",
-        "user-agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/137.0.0.0 Safari/537.36"
     }
 
-    print("🚀 Sending headers:", headers)
     response = requests.get(url, headers=headers)
-    print("📥 API Response:", response.status_code, response.text)
 
     if response.status_code == 401:
         send_alert("🔐 Token expired! Please update the TOKEN in Railway.")
@@ -45,17 +55,11 @@ def check_submissions():
 
     data = response.json()
     assignments = data.get("examallocation", [])
-
-    print("📦 Assignments data:", assignments)
-
     alerts = []
+
     for a in assignments:
         if a.get("assignment_status") == "Not Submitted":
-            alerts.append(
-                f"📚 {a['name']}\n📘 {a['coursename']}\n🕒 Due: {a['end_date']}"
-            )
-
-    print("🔔 Alerts to send:", alerts)
+            alerts.append(f"📚 {a['name']}\n📘 {a['coursename']}\n🕒 Due: {a['end_date']}")
 
     if alerts:
         for msg in alerts:
@@ -63,4 +67,6 @@ def check_submissions():
     else:
         send_alert("✅ Bot ran — no pending submissions found.")
 
-check_submissions()
+# Main execution
+token = refresh_token()
+check_submissions(token)
